@@ -581,25 +581,29 @@ class ICal
             $eventTimeZone = rtrim($date[1], ':');
         }
 
+        // $this->defaultTimeZone not defined if called from outside object
+        $defaultTimeZone = date_default_timezone_get();
+
         // Unix timestamp can't represent dates before 1970
         if ($date[2] <= self::UNIX_MIN_YEAR) {
-            $date = new \DateTime($icalDate, new \DateTimeZone($this->defaultTimeZone));
+            $date = new \DateTime($icalDate, new \DateTimeZone($defaultTimeZone));
 
             return date_timestamp_get($date);
         }
 
-        $convDate = new \DateTime('now', new \DateTimeZone($this->defaultTimeZone));
+        if ($date[8] == 'Z') {
+            $convDate = new \DateTime('now', new \DateTimeZone('UTC'));
+        } elseif (isset($eventTimeZone) && $this->isValidTimeZoneId($eventTimeZone)) {
+            $convDate = new \DateTime('now', new \DateTimeZone($eventTimeZone));
+        } else {
+            $convDate = new \DateTime('now', new \DateTimeZone($defaultTimeZone));
+        }
+
         $convDate->setDate((int) $date[2], (int) $date[3], (int) $date[4]);
         $convDate->setTime((int) $date[5], (int) $date[6], (int) $date[7]);
+        $convDate->setTimezone(new \DateTimeZone($defaultTimeZone));
 
-        // Unix timestamps after 03:14:07 UTC 2038-01-19 might cause an overflow
-        // if 32 bit integers are used.
-        if ($date[8] !== 'Z' && isset($eventTimeZone) && $this->isValidTimeZoneId($eventTimeZone)) {
-            $convDate->setTimezone(new \DateTimeZone($eventTimeZone));
-        }
         $timestamp  = $convDate->getTimestamp();
-        $timestamp += $convDate->getOffset();
-
         return $timestamp;
     }
 
